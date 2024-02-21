@@ -34,6 +34,45 @@ const mainRouter = createTRPCRouter({
         throw new Error("Internal Server Error");
       }
     }),
+
+  deleteTaskById: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        await db.tasks.delete({ where: { id: input.id } });
+
+        return true;
+      } catch (error) {
+        throw new Error("Internal Server Error");
+      }
+    }),
+
+  completeTaskById: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        await db.tasks.update({
+          where: { id: input.id },
+          data: { completed: true },
+        });
+        return true;
+      } catch (error) {
+        throw new Error("Internal Server Error");
+      }
+    }),
+
+  uncompleteTaskById: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        await db.tasks.update({
+          where: { id: input.id },
+          data: { completed: false },
+        });
+      } catch (error) {
+        throw new Error("Internal Server Error");
+      }
+    }),
 });
 
 export default mainRouter;

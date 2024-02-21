@@ -13,11 +13,7 @@ interface Tasks {
   description: string | null | undefined;
   completed: boolean;
 }
-[];
 
-interface ApiResponse {
-  tasks: Tasks;
-}
 const Home = () => {
   const { data: session } = useSession();
   const [expiredTasksViewActive, setExpiredTasksViewActive] =
@@ -25,23 +21,26 @@ const Home = () => {
   const [dataTasks, setDataTasks] = useState<Tasks[]>([]);
   const [createNewTaskInputActive, setCreateNewTaskInputActive] =
     useState<boolean>(false);
+  const [activeTasks, setActiveTasks] = useState<Tasks[]>([]);
+  const [completedTasks, setCompletedTasks] = useState<Tasks[]>([]);
 
   const { data, refetch } = api.main.getTasksByUserId.useQuery();
 
-  const [title, setTitle] = useState<string>(" ");
+  const [title, setTitle] = useState<string>("");
   const [description, setDescription] = useState<string | undefined>(null);
 
   useEffect(() => {
     try {
       if (data) {
-        setDataTasks(data);
+        const active = data.filter((task) => !task.completed);
+        const completed = data.filter((task) => task.completed);
+        setActiveTasks(active);
+        setCompletedTasks(completed);
       }
-    } catch (error) {}
+    } catch (error) {
+      console.error(error);
+    }
   }, [data]);
-
-  console.log(data);
-  console.log(dataTasks);
-  //Get Tasks By ID
 
   const toggleCreateNewTaskInput = () => {
     setCreateNewTaskInputActive(!createNewTaskInputActive);
@@ -73,13 +72,41 @@ const Home = () => {
     }
   };
 
-  if (!session) {
-    return (
-      <>
-        <button onClick={() => signIn()}>Login With Discord</button>
-      </>
-    );
-  }
+  const mutationDeleteTask = api.main.deleteTaskById.useMutation();
+  const handleTaskDelete = async (id: string) => {
+    try {
+      console.log("Deleting ");
+      await mutationDeleteTask.mutateAsync({ id });
+      await refetch();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const mutationCompleteTask = api.main.completeTaskById.useMutation();
+  const handleTaskComplete = async (id: string) => {
+    try {
+      await mutationCompleteTask.mutateAsync({ id });
+      await refetch();
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const mutationUndoCompletedTask = api.main.uncompleteTaskById.useMutation();
+  const handleTaskCompleteUndo = async (id: string) => {
+    try {
+      console.log("Test");
+      await mutationUndoCompletedTask.mutateAsync({ id });
+      await refetch();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const filterTasksByCompletedStatus = () => {
+    setExpiredTasksViewActive(!expiredTasksViewActive);
+  };
 
   return (
     <>
@@ -88,32 +115,63 @@ const Home = () => {
         <div className="justify-center self-center rounded-lg bg-amber-100 p-16">
           <div>
             <h3 className="text-center text-xl">Active Tasks</h3>
-            {dataTasks.length === 0 ? (
+            {activeTasks.length === 0 ? (
               <h3 className="text-center">
-                <i>No Tasks Found</i>
+                <i>No Active Tasks Found</i>
               </h3>
             ) : (
-              <>
-                {" "}
-                {dataTasks.map((task) => (
-                  <>
-                    <div className="flex flex-col bg-white px-7 py-3">
-                      <i>Created At: {task.created_at.toDateString()}</i>
-                      {task.title}
-                      {task.description ? task.description : ""}
-                    </div>
-                  </>
-                ))}
-              </>
+              activeTasks.map((task) => (
+                <div key={task.id} className="flex flex-col bg-white px-7 py-3">
+                  <i>Created At: {task.created_at.toDateString()}</i>
+                  <div className="text-lg font-semibold">{task.title}</div>
+                  <div>{task.description ? task.description : ""}</div>
+                  <button
+                    className="max-w-fit rounded-md bg-green-500 px-2 hover:bg-green-600"
+                    onClick={() => handleTaskComplete(task.id)}
+                  >
+                    Complete Task
+                  </button>
+                  <button
+                    className="max-w-fit rounded-md bg-red-500 px-2 hover:bg-red-600"
+                    onClick={() => handleTaskDelete(task.id)}
+                  >
+                    Delete
+                  </button>
+                </div>
+              ))
             )}
           </div>
-
+          <h3 className="text-center text-xl">Completed Tasks</h3>
+          {completedTasks.length === 0 ? (
+            <h3 className="text-center">
+              <i>No Completed Tasks Found</i>
+            </h3>
+          ) : (
+            completedTasks.map((task) => (
+              <div key={task.id} className="flex flex-col bg-white px-7 py-3">
+                <i>Created At: {task.created_at.toDateString()}</i>
+                <div className="text-lg font-semibold">{task.title}</div>
+                <div>{task.description ? task.description : ""}</div>
+                <button
+                  className="max-w-fit rounded-md bg-blue-500 px-2 hover:bg-blue-600"
+                  onClick={() => handleTaskCompleteUndo(task.id)}
+                >
+                  Revert Completed Task
+                </button>
+                <button
+                  className="max-w-fit rounded-md bg-red-500 px-2 hover:bg-red-600"
+                  onClick={() => handleTaskDelete(task.id)}
+                >
+                  Delete
+                </button>
+              </div>
+            ))
+          )}
           <div className="mt-4 text-center text-xl">
-            <button className="rounded-lg p-2 text-center text-xl font-semibold hover:bg-amber-200 ">
-              {!expiredTasksViewActive
-                ? "View Expired Tasks"
-                : "Hide Expired Tasks"}
-            </button>
+            <button
+              className="rounded-lg p-2 text-center text-xl font-semibold hover:bg-amber-200"
+              onClick={filterTasksByCompletedStatus}
+            ></button>
           </div>
           <button
             className="bottom-0 mt-7 justify-center self-center rounded-lg p-2 text-center text-xl font-semibold hover:bg-amber-200"
@@ -122,27 +180,25 @@ const Home = () => {
             Create New Task
           </button>
           {createNewTaskInputActive ? (
-            <>
-              <div className="flex flex-col">
-                <input
-                  type="text"
-                  placeholder="Title"
-                  className="mb-2 rounded-md"
-                  onChange={handleChangeTitle}
-                />
-                <textarea
-                  className="mt-2 h-32 max-h-64 max-w-md resize rounded-md"
-                  placeholder="Description"
-                  onChange={handleChangeDescription}
-                ></textarea>
-                <button
-                  className="mt-5 max-h-fit max-w-fit justify-center self-center rounded-lg bg-blue-500 px-5 py-3 text-center text-white"
-                  onClick={handleCreateNewTask}
-                >
-                  Create Task
-                </button>
-              </div>
-            </>
+            <div className="flex flex-col">
+              <input
+                type="text"
+                placeholder="Title"
+                className="mb-2 rounded-md"
+                onChange={handleChangeTitle}
+              />
+              <textarea
+                className="mt-2 h-32 max-h-64 max-w-md resize rounded-md"
+                placeholder="Description"
+                onChange={handleChangeDescription}
+              ></textarea>
+              <button
+                className="mt-5 max-h-fit max-w-fit justify-center self-center rounded-lg bg-blue-500 px-5 py-3 text-center text-white"
+                onClick={handleCreateNewTask}
+              >
+                Create Task
+              </button>
+            </div>
           ) : (
             ""
           )}
