@@ -87,6 +87,6 @@ model Shared_Tasks {
     id String @id @default(cuid())
     task_id String 
     shared_at DateTime @default(now())
-    original_user_that_created_task String
+    original_user_that_created_task String?
     shared_with_user_id String
 }
